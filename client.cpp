@@ -5,7 +5,6 @@
 
 #pragma comment(lib, "ws2_32.lib")  // Link against the Winsock library
 
-/*
 int main() {
     // Initialize Winsock
     WSADATA wsaData;
@@ -42,10 +41,44 @@ int main() {
 
     std::cout << "Connected to server.\n";
 
+    char recvBuffer[2048];
+
+    // listen for request from server  
+    int bytesReceived = recv(clientSocket, recvBuffer, sizeof(recvBuffer), 0);
+    if (bytesReceived > 0) {
+        recvBuffer[bytesReceived] = '\0'; // Null-terminate the received data
+        std::cout << recvBuffer << std::endl;
+    }
+
+    // send n to server 
+    int n; 
+
+    std::cin >> n;
+
+    int sendData = htonl(n);
+    int bytesSent = send(clientSocket, reinterpret_cast<char*>(&sendData), sizeof(sendData), 0);
+
+    // wait for response from server 
+    int receivedNumPrime;
+    do {
+        bytesReceived = recv(clientSocket, reinterpret_cast<char*>(&receivedNumPrime), sizeof(receivedNumPrime), 0);
+
+        if (bytesReceived > 0) {
+            receivedNumPrime = ntohl(receivedNumPrime); 
+            std::cout << "Number of primes: " << receivedNumPrime << std::endl;
+        }
+        else if (bytesReceived == 0) { // if server socket closes 
+            std::cout << "Connection closing...\n";
+        }
+        else {
+            std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
+        }
+
+    } while (bytesReceived > 0); 
+
     // Cleanup
     closesocket(clientSocket);
     WSACleanup();
 
     return 0;
 }
-*/
