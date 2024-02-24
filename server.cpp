@@ -191,7 +191,7 @@ int main() {
             numPrimes += num; 
         }
         else if (bytesReceived == 0) {
-            std::cout << "Connection closed by client...\n";
+            std::cout << "Connection closed by server1...\n";
         }
         else {
             std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
@@ -208,7 +208,7 @@ int main() {
             numPrimes += num;
         }
         else if (bytesReceived == 0) {
-            std::cout << "Connection closed by client...\n";
+            std::cout << "Connection closed by server2...\n";
         }
         else {
             std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
