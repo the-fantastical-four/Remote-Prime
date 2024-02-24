@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <random>
 
-#define N_THREADS 32
+#define N_THREADS 4
 
 int PORT = 6250;
 int SERVER1_PORT = 6251;
@@ -15,8 +15,10 @@ int SERVER2_PORT = 6252;
 bool checkPrime(const int& n);
 void getPrimes(int lowerBound, int upperBound, std::vector<int>& numList, std::vector<int>& primes);
 int launchThreads(std::vector<int> numList);
+void listenForResponse(SOCKET server, int& numPrimes);
 
 std::mutex myMutex;
+std::mutex numPrimesMutex; 
 
 int main() {
     bool server1Connect = false; 
@@ -75,12 +77,12 @@ int main() {
     sockaddr_in server1Addr;
     server1Addr.sin_family = AF_INET;
     server1Addr.sin_port = htons(SERVER1_PORT); // Port of the first other server
-    server1Addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // IP of the first other server
+    server1Addr.sin_addr.s_addr = inet_addr("25.17.98.165"); // IP of the first other server
 
     sockaddr_in server2Addr;
     server2Addr.sin_family = AF_INET;
     server2Addr.sin_port = htons(SERVER2_PORT); // Port of the second other server
-    server2Addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // IP of the second other server
+    server2Addr.sin_addr.s_addr = inet_addr("25.31.167.13"); // IP of the second other server
 
     // Create sockets for connecting to the other servers
     SOCKET server1Socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -177,42 +179,25 @@ int main() {
         }
     }
 
-    // main server doing own work 
-    int numPrimes = launchThreads(slices[0]); 
+    int numPrimes = 0; 
 
-    // receive messages from sub servers 
+    // launch threads to listen for responses from subservers 
+    std::vector<std::thread> listeners;
+
     if (server1Connect) {
-        int num; 
-        bytesReceived = recv(server1Socket, reinterpret_cast<char*>(&num), sizeof(num), 0);
-
-        if (bytesReceived > 0) {
-            // Convert from network byte order to host byte order
-            num = ntohl(num);
-            numPrimes += num; 
-        }
-        else if (bytesReceived == 0) {
-            std::cout << "Connection closed by server1...\n";
-        }
-        else {
-            std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
-        }
+        listeners.emplace_back(listenForResponse, server1Socket, std::ref(numPrimes));
     }
 
     if (server2Connect) {
-        int num;
-        bytesReceived = recv(server2Socket, reinterpret_cast<char*>(&num), sizeof(num), 0);
+        listeners.emplace_back(listenForResponse, server2Socket, std::ref(numPrimes)); 
+    }
 
-        if (bytesReceived > 0) {
-            // Convert from network byte order to host byte order
-            num = ntohl(num);
-            numPrimes += num;
-        }
-        else if (bytesReceived == 0) {
-            std::cout << "Connection closed by server2...\n";
-        }
-        else {
-            std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
-        }
+    // main server doing own work 
+    numPrimes += launchThreads(slices[0]); 
+
+    // wait for listener threads 
+    for (auto& listener : listeners) {
+        listener.join();
     }
 
     // send number of primes to client  
@@ -230,6 +215,26 @@ int main() {
     WSACleanup();
 
     return 0;
+}
+
+void listenForResponse(SOCKET server, int& numPrimes) {
+    // receive messages from sub servers 
+    int num;
+    int bytesReceived = recv(server, reinterpret_cast<char*>(&num), sizeof(num), 0);
+
+    if (bytesReceived > 0) {
+        // Convert from network byte order to host byte order
+        num = ntohl(num);
+        numPrimesMutex.lock(); 
+        numPrimes += num; 
+        numPrimesMutex.unlock(); 
+    }
+    else if (bytesReceived == 0) {
+        std::cout << "Connection closed by server1...\n";
+    }
+    else {
+        std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
+    }
 }
 
 // returns number of primes from a list of numbers
