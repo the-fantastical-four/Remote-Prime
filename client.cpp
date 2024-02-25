@@ -53,9 +53,9 @@ int main() {
     }
 
     // send n to server 
-    int n; 
+    int n = 100000000; 
 
-    std::cin >> n;
+    // std::cin >> n;
 
     int sendData = htonl(n);
 
