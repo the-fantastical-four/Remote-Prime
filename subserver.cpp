@@ -10,7 +10,7 @@
 
 #pragma comment(lib, "ws2_32.lib")  // Link against the Winsock library
 
-#define N_THREADS 32
+#define N_THREADS 4
 int PORT = 6251;
 
 bool checkPrime(const int& n);
@@ -71,20 +71,16 @@ int main() {
 
     // Receive the size of the list first
 
-    const int bufferSize = 1024; // Adjust the buffer size as needed
-    std::vector<char> buffer(bufferSize);
+    // Receive the size of the vector
+    int32_t receivedSize;
+    char sizeBuffer[sizeof(receivedSize)];
+    recv(mainServerSocket, sizeBuffer, sizeof(receivedSize), 0);
+    memcpy(&receivedSize, sizeBuffer, sizeof(receivedSize));
 
-    int bytesReceived = recv(mainServerSocket, buffer.data(), bufferSize, 0);
-    if (bytesReceived == SOCKET_ERROR) {
-        std::cerr << "Receive failed" << std::endl;
-        closesocket(mainServerSocket);
-        closesocket(serverSocket);
-        WSACleanup();
-        return 1;
-    }
-
-    // Extract the received data from the buffer
-    std::vector<int> receivedVector(buffer.begin(), buffer.begin() + bytesReceived);
+    // Allocate space for the vector data and receive it
+    std::vector<int> receivedVector(receivedSize);
+    char* recvDataBuffer = reinterpret_cast<char*>(receivedVector.data());
+    recv(mainServerSocket, recvDataBuffer, sizeof(int) * receivedSize, 0);
    
     // Process the received list of numbers
     int numPrimes = launchThreads(receivedVector);

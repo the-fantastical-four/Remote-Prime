@@ -131,6 +131,7 @@
   <ItemGroup>
     <ClCompile Include="client.cpp" />
     <ClCompile Include="server.cpp" />
+    <ClCompile Include="subserver.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -77,12 +77,12 @@ int main() {
     sockaddr_in server1Addr;
     server1Addr.sin_family = AF_INET;
     server1Addr.sin_port = htons(SERVER1_PORT); // Port of the first other server
-    server1Addr.sin_addr.s_addr = inet_addr("25.17.98.165"); // IP of the first other server
+    server1Addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // IP of the first other server
 
     sockaddr_in server2Addr;
     server2Addr.sin_family = AF_INET;
     server2Addr.sin_port = htons(SERVER2_PORT); // Port of the second other server
-    server2Addr.sin_addr.s_addr = inet_addr("25.31.167.13"); // IP of the second other server
+    server2Addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // IP of the second other server
 
     // Create sockets for connecting to the other servers
     SOCKET server1Socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -162,13 +162,29 @@ int main() {
 
     // sending messages to sub servers  
     for (int i = 1; i < serverConnections; i++) { // start at 1 to exclude slice of main server 
-        std::vector<char> byteStream(slices[i].begin(), slices[i].end()); 
 
-        int bytesSent = (i == 1 && server1Connect) ?
-            send(server1Socket, byteStream.data(), byteStream.size(), 0) : 
-            send(server2Socket, byteStream.data(), byteStream.size(), 0);
+        int32_t size = static_cast<int32_t>(slices[i].size());
+        char* sizeBytes = reinterpret_cast<char*>(&size);
 
-        if (bytesSent == SOCKET_ERROR) {
+        // Serialize the vector data
+        char* dataBytes = reinterpret_cast<char*>(slices[i].data());
+        int dataBytesSize = sizeof(int) * size;
+
+        int sizeBytesSent; 
+        int dataBytesSent; 
+
+        // send data 
+        if (i == 1 && server1Connect) {
+            sizeBytesSent = send(server1Socket, sizeBytes, sizeof(size), 0); 
+            dataBytesSent = send(server1Socket, dataBytes, dataBytesSize, 0); 
+        }
+        else {
+            sizeBytesSent = send(server2Socket, sizeBytes, sizeof(size), 0);
+            dataBytesSent = send(server2Socket, dataBytes, dataBytesSize, 0);
+        }
+        
+        // check for errors 
+        if (sizeBytesSent == SOCKET_ERROR || dataBytesSent == SOCKET_ERROR) {
             std::cerr << "Failed to send data" << std::endl;
             if (server1Connect) closesocket(server1Socket);
             if (server2Connect) closesocket(server2Socket); 
@@ -177,6 +193,7 @@ int main() {
             WSACleanup();
             return 1;
         }
+        
     }
 
     int numPrimes = 0; 
@@ -193,7 +210,12 @@ int main() {
     }
 
     // main server doing own work 
-    numPrimes += launchThreads(slices[0]); 
+    int temp = launchThreads(slices[0]); 
+    std::cout << "main caluclated = " << temp << std::endl; 
+
+    numPrimesMutex.lock(); 
+    numPrimes += temp; 
+    numPrimesMutex.unlock(); 
 
     // wait for listener threads 
     for (auto& listener : listeners) {
