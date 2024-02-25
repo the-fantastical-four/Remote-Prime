@@ -79,7 +79,14 @@ int main() {
 
     // Allocate space for the vector data and receive it
     std::vector<int> receivedVector(receivedSize);
-    recv(mainServerSocket, reinterpret_cast<char*>(receivedVector.data()), sizeof(int) * receivedSize, 0);
+
+    // Receive and deserialize vector data
+    for (size_t i = 0; i < receivedSize; ++i) {
+        char dataBuffer[sizeof(int)];
+        recv(mainServerSocket, dataBuffer, sizeof(int), 0);
+        std::memcpy(&receivedVector[i], dataBuffer, sizeof(int));
+    }
+    // recv(mainServerSocket, reinterpret_cast<char*>(receivedVector.data()), sizeof(int) * receivedSize, 0);
 
     std::cout << "Received vector size: " << receivedVector.size() << std::endl;
    
