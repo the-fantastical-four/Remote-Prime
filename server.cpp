@@ -13,8 +13,8 @@ int SERVER1_PORT = 6251;
 int SERVER2_PORT = 6252;
 
 bool checkPrime(const int& n);
-void getPrimes(int lowerBound, int upperBound, std::vector<int>& numList, std::vector<int>& primes);
-int launchThreads(std::vector<int> numList);
+void getPrimes(int lowerBound, int upperBound, std::vector<int>& primes);
+int launchThreads(int start, int end);
 void listenForResponse(SOCKET server, int& numPrimes);
 
 std::mutex myMutex;
@@ -130,64 +130,37 @@ int main() {
         std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
     }
 
-    // generate list 
-    std::vector<int> mainNumList;
-
-    for (int i = 1; i <= n; i++) {
-        mainNumList.emplace_back(i); 
-    }
-
-    // shuffle list 
-    std::random_device rd;
-    std::mt19937 rng(rd());
-
-    std::shuffle(mainNumList.begin(), mainNumList.end(), rng);
-
-    // slice list 
-    std::vector<std::vector<int>> slices; 
+    std::vector<std::pair<int, int>> indices; 
 
     for (int i = 0; i < serverConnections; i++) {
-        int division = mainNumList.size() / serverConnections; 
-        int start = division * i; 
-        int end = mainNumList.size();
+        int division = n / serverConnections; 
+        int start = division * i + 1;
+        int end = n;
 
         if (i < serverConnections - 1) {
             end = division * (i + 1); 
         }
-
-        std::vector<int> slice(mainNumList.begin() + start, mainNumList.begin() + end);
-
-        slices.emplace_back(slice); 
+        indices.emplace_back(std::make_pair(start, end)); 
     }
 
     // sending messages to sub servers  
     for (int i = 1; i < serverConnections; i++) { // start at 1 to exclude slice of main server 
 
-        int32_t size = static_cast<int32_t>(slices[i].size());
-        char* sizeBytes = reinterpret_cast<char*>(&size);
+        int start = indices[i].first; 
+        int end = indices[i].second;
 
-        // Serialize the vector data
-        char* dataBytes = reinterpret_cast<char*>(slices[i].data());
-        int dataBytesSize = sizeof(int) * size;
+        int startData = htonl(start);
+        int endData = htonl(end); 
 
-        int sizeBytesSent; 
-        int dataBytesSent; 
+        int socket = (server1Connect && i == 1) ? server1Socket : server2Socket; 
 
-        // send data 
-        if (i == 1 && server1Connect) {
-            sizeBytesSent = send(server1Socket, sizeBytes, sizeof(size), 0); 
-            dataBytesSent = send(server1Socket, dataBytes, dataBytesSize, 0); 
-        }
-        else {
-            sizeBytesSent = send(server2Socket, sizeBytes, sizeof(size), 0);
-            dataBytesSent = send(server2Socket, dataBytes, dataBytesSize, 0);
-        }
+        int startSent = send(socket, reinterpret_cast<char*>(&startData), sizeof(startData), 0);
+        int endSent = send(socket, reinterpret_cast<char*>(&endData), sizeof(endData), 0); 
         
         // check for errors 
-        if (sizeBytesSent == SOCKET_ERROR || dataBytesSent == SOCKET_ERROR) {
+        if (startSent == SOCKET_ERROR || endSent == SOCKET_ERROR) {
             std::cerr << "Failed to send data" << std::endl;
-            if (server1Connect) closesocket(server1Socket);
-            if (server2Connect) closesocket(server2Socket); 
+            closesocket(socket);
             closesocket(clientSocket); 
             closesocket(serverSocket); 
             WSACleanup();
@@ -210,7 +183,7 @@ int main() {
     }
 
     // main server doing own work 
-    int temp = launchThreads(slices[0]); 
+    int temp = launchThreads(indices[0].first, indices[0].second);
     std::cout << "main caluclated = " << temp << std::endl; 
 
     numPrimesMutex.lock(); 
@@ -260,22 +233,21 @@ void listenForResponse(SOCKET server, int& numPrimes) {
 }
 
 // returns number of primes from a list of numbers
-int launchThreads(std::vector<int> numList) {
+int launchThreads(int start, int end) {
     // get primes 
     std::vector<int> primes;
     std::vector<std::thread> threads;
 
     // launch threads 
     for (int i = 0; i < N_THREADS; i++) {
-        int division = numList.size() / N_THREADS;
-        int lowerBound = division * i;
-        int upperBound = numList.size();
+        int division = (end - start + 1) / N_THREADS;
+        int lowerBound = division * i + start;
+        int upperBound = end + 1;
 
         if (i < N_THREADS - 1) {
-            upperBound = division * (i + 1);
+            upperBound = division * (i + 1) + start;
         }
-
-        threads.emplace_back(getPrimes, lowerBound, upperBound, std::ref(numList), std::ref(primes));
+        threads.emplace_back(getPrimes, lowerBound, upperBound, std::ref(primes));
     }
 
     // wait for threads to finish 
@@ -299,9 +271,9 @@ bool checkPrime(const int& n) {
     return true;
 }
 
-void getPrimes(int lowerBound, int upperBound, std::vector<int>& numList, std::vector<int>& primes) {
+void getPrimes(int lowerBound, int upperBound, std::vector<int>& primes) {
     for (int i = lowerBound; i < upperBound; i++) {
-        if (checkPrime(numList[i])) {
+        if (checkPrime(i)) {
             std::unique_lock<std::mutex> lock(myMutex);
             primes.push_back(i);
             lock.unlock();

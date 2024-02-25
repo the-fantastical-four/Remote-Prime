@@ -14,8 +14,8 @@
 int PORT = 6251;
 
 bool checkPrime(const int& n);
-void getPrimes(int lowerBound, int upperBound, std::vector<int>& numList, std::vector<int>& primes);
-int launchThreads(std::vector<int> numList);
+void getPrimes(int lowerBound, int upperBound, std::vector<int>& primes);
+int launchThreads(int start, int end);
 
 std::mutex myMutex;
 
@@ -69,29 +69,38 @@ int main() {
 
     std::cout << "Connected to Main Server" << std::endl;
 
-    // Receive the size of the list first
+    int start;
+    int bytesReceived = recv(mainServerSocket, reinterpret_cast<char*>(&start), sizeof(start), 0);
 
-    // Receive the size of the vector
-    int32_t receivedSize;
-    char sizeBuffer[sizeof(receivedSize)];
-    recv(mainServerSocket, sizeBuffer, sizeof(receivedSize), 0);
-    memcpy(&receivedSize, sizeBuffer, sizeof(receivedSize));
-
-    // Allocate space for the vector data and receive it
-    std::vector<int> receivedVector(receivedSize);
-
-    // Receive and deserialize vector data
-    for (size_t i = 0; i < receivedSize; ++i) {
-        char dataBuffer[sizeof(int)];
-        recv(mainServerSocket, dataBuffer, sizeof(int), 0);
-        std::memcpy(&receivedVector[i], dataBuffer, sizeof(int));
+    if (bytesReceived > 0) {
+        // Convert from network byte order to host byte order
+        start = ntohl(start);
+        std::cout << "Received start: " << start << std::endl;
     }
-    // recv(mainServerSocket, reinterpret_cast<char*>(receivedVector.data()), sizeof(int) * receivedSize, 0);
+    else if (bytesReceived == 0) {
+        std::cout << "Connection closed by client...\n";
+    }
+    else {
+        std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
+    }
 
-    std::cout << "Received vector size: " << receivedVector.size() << std::endl;
+    int end; 
+    bytesReceived = recv(mainServerSocket, reinterpret_cast<char*>(&end), sizeof(end), 0);
+
+    if (bytesReceived > 0) {
+        // Convert from network byte order to host byte order
+        end = ntohl(end);
+        std::cout << "Received end: " << end << std::endl;
+    }
+    else if (bytesReceived == 0) {
+        std::cout << "Connection closed by client...\n";
+    }
+    else {
+        std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
+    }
    
     // Process the received list of numbers
-    int numPrimes = launchThreads(receivedVector);
+    int numPrimes = launchThreads(start, end);
     std::cout << "Total primes found: " << numPrimes << std::endl;
 
     int totalPrimes = htonl(numPrimes);
@@ -105,22 +114,23 @@ int main() {
     return 0;
 }
 
-int launchThreads(std::vector<int> numList) {
+// returns number of primes from a list of numbers
+int launchThreads(int start, int end) {
     // get primes 
     std::vector<int> primes;
     std::vector<std::thread> threads;
 
     // launch threads 
     for (int i = 0; i < N_THREADS; i++) {
-        int division = numList.size() / N_THREADS;
-        int lowerBound = division * i;
-        int upperBound = numList.size();
+        int division = (end - start + 1) / N_THREADS;
+        int lowerBound = division * i + start;
+        int upperBound = end;
 
         if (i < N_THREADS - 1) {
-            upperBound = division * (i + 1);
+            upperBound = division * (i + 1) + start;
         }
 
-        threads.emplace_back(getPrimes, lowerBound, upperBound, std::ref(numList), std::ref(primes));
+        threads.emplace_back(getPrimes, lowerBound, upperBound, std::ref(primes));
     }
 
     // wait for threads to finish 
@@ -133,8 +143,9 @@ int launchThreads(std::vector<int> numList) {
 
 bool checkPrime(const int& n) {
     if (n == 1) {
-        return false; 
+        return false;
     }
+
     for (int i = 2; i * i <= n; i++) {
         if (n % i == 0) {
             return false;
@@ -143,9 +154,9 @@ bool checkPrime(const int& n) {
     return true;
 }
 
-void getPrimes(int lowerBound, int upperBound, std::vector<int>& numList, std::vector<int>& primes) {
+void getPrimes(int lowerBound, int upperBound, std::vector<int>& primes) {
     for (int i = lowerBound; i < upperBound; i++) {
-        if (checkPrime(numList[i])) {
+        if (checkPrime(i)) {
             std::unique_lock<std::mutex> lock(myMutex);
             primes.push_back(i);
             lock.unlock();
