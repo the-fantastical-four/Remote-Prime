@@ -2,6 +2,8 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>  // Include for InetPton function
 #include <tchar.h>
+#include <chrono>  // Include the chrono library
+
 
 #pragma comment(lib, "ws2_32.lib")  // Link against the Winsock library
 
@@ -56,6 +58,10 @@ int main() {
     std::cin >> n;
 
     int sendData = htonl(n);
+
+    // Start timing before sending data
+    auto start = std::chrono::high_resolution_clock::now();
+
     int bytesSent = send(clientSocket, reinterpret_cast<char*>(&sendData), sizeof(sendData), 0);
 
     // wait for response from server 
@@ -66,6 +72,15 @@ int main() {
         if (bytesReceived > 0) {
             receivedNumPrime = ntohl(receivedNumPrime); 
             std::cout << "Number of primes: " << receivedNumPrime << std::endl;
+
+            // Stop timing after receiving response
+            auto end = std::chrono::high_resolution_clock::now();
+
+            // Calculate the duration
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+            // Output the duration in milliseconds
+            std::cout << "Time taken: " << duration.count() << " milliseconds" << std::endl;
         }
         else if (bytesReceived == 0) { // if server socket closes 
             std::cout << "Connection closing...\n";
