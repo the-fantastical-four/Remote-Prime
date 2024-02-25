@@ -77,7 +77,7 @@ int main() {
     sockaddr_in server1Addr;
     server1Addr.sin_family = AF_INET;
     server1Addr.sin_port = htons(SERVER1_PORT); // Port of the first other server
-    server1Addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // IP of the first other server
+    server1Addr.sin_addr.s_addr = inet_addr("25.17.98.165"); // IP of the first other server
 
     sockaddr_in server2Addr;
     server2Addr.sin_family = AF_INET;
@@ -287,6 +287,10 @@ int launchThreads(std::vector<int> numList) {
 }
 
 bool checkPrime(const int& n) {
+    if (n == 1) {
+        return false; 
+    }
+
     for (int i = 2; i * i <= n; i++) {
         if (n % i == 0) {
             return false;
