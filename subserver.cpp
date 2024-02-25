@@ -79,8 +79,9 @@ int main() {
 
     // Allocate space for the vector data and receive it
     std::vector<int> receivedVector(receivedSize);
-    char* recvDataBuffer = reinterpret_cast<char*>(receivedVector.data());
-    recv(mainServerSocket, recvDataBuffer, sizeof(int) * receivedSize, 0);
+    recv(mainServerSocket, reinterpret_cast<char*>(receivedVector.data()), sizeof(int) * receivedSize, 0);
+
+    std::cout << "Received vector size: " << receivedVector.size() << std::endl;
    
     // Process the received list of numbers
     int numPrimes = launchThreads(receivedVector);
