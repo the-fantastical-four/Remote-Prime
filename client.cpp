@@ -43,28 +43,27 @@ int main() {
 
     std::cout << "Connected to server.\n";
 
-    char recvBuffer[2048];
+    // TODO: prompt user for a start point and end point 
+    int startPoint;
+    int endPoint; 
 
-    // listen for request from server  
-    int bytesReceived = recv(clientSocket, recvBuffer, sizeof(recvBuffer), 0);
-    if (bytesReceived > 0) {
-        recvBuffer[bytesReceived] = '\0'; // Null-terminate the received data
-        std::cout << recvBuffer << std::endl;
-    }
+    std::cout << "Input start: "; 
+    std::cin >> startPoint; 
 
-    // send n to server 
-    int n = 100000000; 
+    std::cout << "Input end: "; 
+    std::cin >> endPoint; 
 
-    // std::cin >> n;
-
-    int sendData = htonl(n);
+    int startData = htonl(startPoint);
+    int endData = htonl(endPoint); 
 
     // Start timing before sending data
     auto start = std::chrono::high_resolution_clock::now();
 
-    int bytesSent = send(clientSocket, reinterpret_cast<char*>(&sendData), sizeof(sendData), 0);
+    send(clientSocket, reinterpret_cast<char*>(&startData), sizeof(startData), 0);
+    send(clientSocket, reinterpret_cast<char*>(&endData), sizeof(endData), 0); 
 
     // wait for response from server 
+    int bytesReceived; 
     int receivedNumPrime;
     do {
         bytesReceived = recv(clientSocket, reinterpret_cast<char*>(&receivedNumPrime), sizeof(receivedNumPrime), 0);

@@ -110,18 +110,32 @@ int main() {
         server2Connect = true; 
     }
 
-    // send request to client to get n 
-    const char* sendData = "Please enter n: ";
-    send(clientSocket, sendData, strlen(sendData), 0);
+    // TODO: change to receive start and end point 
 
     // Receiving an n from client
-    int n;
-    int bytesReceived = recv(clientSocket, reinterpret_cast<char*>(&n), sizeof(n), 0);
+    int receivedStart;
+    int bytesReceived = recv(clientSocket, reinterpret_cast<char*>(&receivedStart), sizeof(receivedStart), 0);
 
     if (bytesReceived > 0) {
         // Convert from network byte order to host byte order
-        n = ntohl(n);
-        std::cout << "Received integer: " << n << std::endl;
+        receivedStart = ntohl(receivedStart);
+        std::cout << "Received integer: " << receivedStart << std::endl;
+    }
+    else if (bytesReceived == 0) {
+        std::cout << "Connection closed by client...\n";
+    }
+    else {
+        std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
+    }
+
+    // Receiving an n from client
+    int receivedEnd;
+    int bytesReceived = recv(clientSocket, reinterpret_cast<char*>(&receivedEnd), sizeof(receivedEnd), 0);
+
+    if (bytesReceived > 0) {
+        // Convert from network byte order to host byte order
+        receivedEnd = ntohl(receivedEnd);
+        std::cout << "Received integer: " << receivedEnd << std::endl;
     }
     else if (bytesReceived == 0) {
         std::cout << "Connection closed by client...\n";
@@ -132,13 +146,13 @@ int main() {
 
     std::vector<std::pair<int, int>> indices; 
 
-    for (int i = 0; i < serverConnections; i++) {
-        int division = n / serverConnections; 
+    for (int i = receivedStart; i < serverConnections; i++) {
+        int division = receivedEnd / serverConnections; 
         int start = division * i + 1;
-        int end = n;
+        int end = receivedEnd;
 
         if (i < serverConnections - 1) {
-            end = division * (i + 1); 
+            end = division * (i + receivedStart); 
         }
         indices.emplace_back(std::make_pair(start, end)); 
     }
