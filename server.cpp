@@ -119,7 +119,7 @@ int main() {
     if (bytesReceived > 0) {
         // Convert from network byte order to host byte order
         receivedStart = ntohl(receivedStart);
-        std::cout << "Received integer: " << receivedStart << std::endl;
+        std::cout << "Received start point: " << receivedStart << std::endl;
     }
     else if (bytesReceived == 0) {
         std::cout << "Connection closed by client...\n";
@@ -135,7 +135,7 @@ int main() {
     if (bytesReceived > 0) {
         // Convert from network byte order to host byte order
         receivedEnd = ntohl(receivedEnd);
-        std::cout << "Received integer: " << receivedEnd << std::endl;
+        std::cout << "Received end point: " << receivedEnd << std::endl;
     }
     else if (bytesReceived == 0) {
         std::cout << "Connection closed by client...\n";
@@ -143,8 +143,6 @@ int main() {
     else {
         std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
     }
-
-    std::cout << "Received start: " << receivedStart << " received end: " << receivedEnd << std::endl; 
 
     std::vector<std::pair<int, int>> indices; 
 
@@ -254,11 +252,9 @@ int launchThreads(int start, int end) {
     std::vector<int> primes;
     std::vector<std::thread> threads;
 
-    std::cout << "main start: " << start << " end: " << end << std::endl; 
-
     // launch threads 
+    int division = (end - start + 1) / N_THREADS;
     for (int i = 0; i < N_THREADS; i++) {
-        int division = (end - start + 1) / N_THREADS;
         int lowerBound = division * i + start;
         int upperBound = end + 1;
 
