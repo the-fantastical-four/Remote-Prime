@@ -130,7 +130,7 @@ int main() {
 
     // Receiving an n from client
     int receivedEnd;
-    int bytesReceived = recv(clientSocket, reinterpret_cast<char*>(&receivedEnd), sizeof(receivedEnd), 0);
+    bytesReceived = recv(clientSocket, reinterpret_cast<char*>(&receivedEnd), sizeof(receivedEnd), 0);
 
     if (bytesReceived > 0) {
         // Convert from network byte order to host byte order
@@ -144,15 +144,17 @@ int main() {
         std::cerr << "recv failed with error: " << WSAGetLastError() << std::endl;
     }
 
+    std::cout << "Received start: " << receivedStart << " received end: " << receivedEnd << std::endl; 
+
     std::vector<std::pair<int, int>> indices; 
 
-    for (int i = receivedStart; i < serverConnections; i++) {
-        int division = receivedEnd / serverConnections; 
-        int start = division * i + 1;
+    int division = (receivedEnd - receivedStart + 1) / serverConnections;
+    for (int i = 0; i < serverConnections; i++) {
+        int start = division * i + receivedStart;
         int end = receivedEnd;
 
         if (i < serverConnections - 1) {
-            end = division * (i + receivedStart); 
+            end = division * (i + 1) + start; 
         }
         indices.emplace_back(std::make_pair(start, end)); 
     }
@@ -251,6 +253,8 @@ int launchThreads(int start, int end) {
     // get primes 
     std::vector<int> primes;
     std::vector<std::thread> threads;
+
+    std::cout << "main start: " << start << " end: " << end << std::endl; 
 
     // launch threads 
     for (int i = 0; i < N_THREADS; i++) {
